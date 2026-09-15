@@ -15,7 +15,8 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withSchedule(function (Schedule $schedule): void {
         $schedule->command('billing:generate-invoices')
             ->dailyAt('00:05')
-            ->withoutOverlapping();
+            ->withoutOverlapping(30)
+            ->onOneServer();
     })
     ->withMiddleware(function (Middleware $middleware): void {
         //

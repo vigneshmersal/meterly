@@ -12,6 +12,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
 {
@@ -20,6 +21,9 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
     public int $timeout = 120;
 
     public int $tries = 3;
+
+    /** @var array<int, int> */
+    public array $backoff = [10, 60, 180];
 
     public int $uniqueFor = 3600;
 
@@ -100,5 +104,10 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
             $this->fromDate,
             $this->toDate,
         ]);
+    }
+
+    public function failed(?Throwable $exception): void
+    {
+        report($exception);
     }
 }
