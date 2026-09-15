@@ -2,14 +2,13 @@
 
 namespace App\Actions\Plans;
 
-use App\Enums\BillingCycle;
 use App\Models\Merchant;
 use App\Models\Plan;
 use App\Services\PlanPricingCache;
+use App\Support\PlanValidationRules;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Rule;
 
 class UpdatePlanAction
 {
@@ -24,13 +23,7 @@ class UpdatePlanAction
     {
         $this->ensureMerchantOwnership($merchant, $plan);
 
-        $validated = Validator::validate($attributes, [
-            'name' => ['required', 'string', 'max:255'],
-            'base_price' => ['required', 'numeric', 'min:0'],
-            'billing_cycle' => ['required', Rule::enum(BillingCycle::class)],
-            'included_units' => ['required', 'integer', 'min:0'],
-            'overage_rate' => ['required', 'numeric', 'min:0'],
-        ]);
+        $validated = Validator::validate($attributes, PlanValidationRules::rules());
 
         $updatedPlan = DB::transaction(function () use ($plan, $validated): Plan {
             $plan->update($validated);

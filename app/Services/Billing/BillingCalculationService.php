@@ -2,6 +2,7 @@
 
 namespace App\Services\Billing;
 
+use App\DTOs\BillingSegmentData;
 use App\Models\SubscriptionPeriod;
 use App\Models\UsageDaily;
 use Carbon\CarbonImmutable;
@@ -73,6 +74,14 @@ class BillingCalculationService
         CarbonInterface $activeStart,
         CarbonInterface $activeEnd,
     ): array {
+        return $this->billingSegment($period, $activeStart, $activeEnd)->toArray();
+    }
+
+    public function billingSegment(
+        SubscriptionPeriod $period,
+        CarbonInterface $activeStart,
+        CarbonInterface $activeEnd,
+    ): BillingSegmentData {
         if ($activeEnd->lessThan($activeStart)) {
             throw new InvalidArgumentException('The active end date must not precede the active start date.');
         }
@@ -81,24 +90,31 @@ class BillingCalculationService
         $usageUnits = (int) UsageDaily::query()
             ->where('merchant_id', $period->subscription->customer->merchant_id)
             ->where('customer_id', $period->subscription->customer_id)
-            ->whereDate('usage_date', '>=', $activeStart->toDateString())
-            ->whereDate('usage_date', '<=', $activeEnd->toDateString())
+            ->where('usage_date', '>=', $activeStart->toDateString().' 00:00:00')
+            ->where(
+                'usage_date',
+                '<',
+                $activeEnd->copy()->addDay()->toDateString().' 00:00:00',
+            )
             ->sum('units');
         $overage = $this->overage($usageUnits, $period->included_units, (string) $period->overage_rate);
         $baseCharge = $this->proratedBaseCharge($period, $activeStart, $activeEnd);
 
-        return [
-            'usage_units' => $usageUnits,
-            'included_units' => $period->included_units,
-            'overage_units' => $overage['units'],
-            'base_charge' => $baseCharge,
-            'overage_amount' => $overage['amount'],
-            'total' => $this->roundMoney(bcadd(
+        return new BillingSegmentData(
+            period: $period,
+            startsAt: CarbonImmutable::parse($activeStart->toDateString()),
+            endsAt: CarbonImmutable::parse($activeEnd->toDateString()),
+            usageUnits: $usageUnits,
+            includedUnits: $period->included_units,
+            overageUnits: $overage['units'],
+            baseCharge: $baseCharge,
+            overageAmount: $overage['amount'],
+            total: $this->roundMoney(bcadd(
                 $this->numericString($baseCharge),
                 $this->numericString($overage['amount']),
                 8,
             )),
-        ];
+        );
     }
 
     private function roundMoney(string $amount): string

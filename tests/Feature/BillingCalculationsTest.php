@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Subscriptions\ChangeSubscriptionPlanAction;
+use App\DTOs\BillingSegmentData;
 use App\Enums\BillingCycle;
 use App\Models\Customer;
 use App\Models\Merchant;
@@ -90,6 +91,26 @@ it('calculates segment charges from aggregated usage', function () {
         'overage_amount' => '300.00',
         'total' => '3300.00',
     ]);
+});
+
+it('returns calculated billing segments as a typed DTO', function () {
+    [, , $customer, , $period] = billingFixture();
+    UsageDaily::factory()->for($period->subscription->customer->merchant)->for($customer)->create([
+        'usage_date' => '2026-09-13',
+        'units' => 13000,
+    ]);
+
+    $segment = app(BillingCalculationService::class)->billingSegment(
+        $period,
+        CarbonImmutable::parse('2026-09-01'),
+        CarbonImmutable::parse('2026-09-30'),
+    );
+
+    expect($segment)->toBeInstanceOf(BillingSegmentData::class)
+        ->and($segment->period->is($period))->toBeTrue()
+        ->and($segment->usageUnits)->toBe(13000)
+        ->and($segment->overageAmount)->toBe('300.00')
+        ->and($segment->toArray()['total'])->toBe('3300.00');
 });
 
 it('creates a new immutable pricing segment for a mid-cycle plan change', function () {

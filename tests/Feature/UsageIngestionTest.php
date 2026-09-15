@@ -1,5 +1,7 @@
 <?php
 
+use App\DTOs\UsageEventData;
+use App\Jobs\AggregateDailyUsageJob;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
@@ -7,6 +9,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\UsageEvent;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
 
 function usagePayload(Merchant $merchant, Customer $customer, SubscriptionPeriod $period): array
 {
@@ -15,7 +18,7 @@ function usagePayload(Merchant $merchant, Customer $customer, SubscriptionPeriod
         'customer_id' => $customer->id,
         'subscription_period_id' => $period->id,
         'event_key' => 'evt_'.fake()->unique()->uuid(),
-        'usage_date' => '2026-09-13',
+        'usage_date' => $period->starts_at->toDateString(),
         'units' => 250,
     ];
 }
@@ -52,6 +55,55 @@ it('records a validated usage event for an authenticated merchant request', func
 
     expect(UsageEvent::query()->where('event_key', $payload['event_key'])->value('units'))
         ->toBe(250);
+});
+
+it('dispatches merchant-scoped aggregation after recording a new event', function () {
+    Queue::fake();
+    [$merchant, $customer, $period] = usageFixture();
+    $payload = usagePayload($merchant, $customer, $period);
+
+    $this->actingAs(User::factory()->for($merchant)->create())
+        ->postJson('/usage', $payload)
+        ->assertCreated();
+
+    Queue::assertPushed(
+        AggregateDailyUsageJob::class,
+        fn (AggregateDailyUsageJob $job): bool => $job->merchantId === $merchant->id
+            && $job->fromDate === $payload['usage_date']
+            && $job->toDate === $payload['usage_date'],
+    );
+});
+
+it('rejects usage outside the subscription period', function () {
+    [$merchant, $customer, $period] = usageFixture();
+    $payload = usagePayload($merchant, $customer, $period);
+    $payload['usage_date'] = $period->ends_at->addDay()->toDateString();
+
+    $this->actingAs(User::factory()->for($merchant)->create())
+        ->postJson('/usage', $payload)
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['usage_date']);
+
+    expect(UsageEvent::query()->count())->toBe(0);
+});
+
+it('builds a usage DTO from validated payload data', function () {
+    $dto = UsageEventData::fromArray([
+        'merchant_id' => 99,
+        'customer_id' => 100,
+        'subscription_period_id' => 101,
+        'event_key' => 'evt_test',
+        'usage_date' => '2026-09-13',
+        'units' => 250,
+    ]);
+
+    expect($dto)->toBeInstanceOf(UsageEventData::class)
+        ->and($dto->merchantId)->toBe(99)
+        ->and($dto->customerId)->toBe(100)
+        ->and($dto->subscriptionPeriodId)->toBe(101)
+        ->and($dto->eventKey)->toBe('evt_test')
+        ->and($dto->usageDate->toDateString())->toBe('2026-09-13')
+        ->and($dto->units)->toBe(250);
 });
 
 it('rejects invalid usage input', function () {

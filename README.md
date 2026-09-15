@@ -20,11 +20,12 @@ The default local configuration uses:
 ```dotenv
 DB_CONNECTION=sqlite
 QUEUE_CONNECTION=database
-CACHE_STORE=database
+CACHE_STORE=redis
 ```
 
-Redis is recommended for production queue uniqueness, scheduler locks, and
-shared plan-pricing cache access.
+Redis is used for the shared plan-pricing cache, queue uniqueness and
+scheduler locks. A running Redis server is required by the default local
+configuration.
 
 ## Installation
 
@@ -39,8 +40,9 @@ npm run build
 ```
 
 Configure `DB_*`, `QUEUE_CONNECTION`, `DB_QUEUE_RETRY_AFTER`, `CACHE_STORE`,
-`CACHE_PREFIX`, and Redis or database credentials in `.env` as appropriate for
-the environment.
+`CACHE_PREFIX`, and the Redis credentials in `.env` as appropriate for the
+environment. Set `CACHE_STORE=database` only when deliberately using the
+database cache fallback.
 
 ## Running the application
 
@@ -129,6 +131,14 @@ creating or counting a second event:
 ```
 
 The endpoint is authenticated, validated, merchant-scoped, and rate-limited.
+The named `usage` limiter allows 1,000 requests per minute per authenticated
+merchant. The limiter key is derived from the authenticated user's merchant,
+not the request body, so a client cannot consume another merchant's quota.
+Exceeding the limit returns HTTP 429.
+
+After a new event is committed, a merchant-scoped daily aggregation job is
+queued for the event date. Retried or idempotent duplicate requests do not
+create a second event or enqueue duplicate aggregation work.
 
 ### Merchant dashboard
 
@@ -282,3 +292,9 @@ php artisan migrate:status
 
 See [doc/operations.md](doc/operations.md) for worker, scheduler, and cache
 operations.
+
+## AI Assistance
+
+AI tools were used for requirement analysis, architecture discussion, code
+scaffolding, test generation, and code review. All generated code was
+reviewed, tested, and modified as required.

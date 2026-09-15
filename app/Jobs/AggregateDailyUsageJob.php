@@ -4,8 +4,9 @@ namespace App\Jobs;
 
 use App\Models\UsageDaily;
 use App\Models\UsageEvent;
+use Carbon\CarbonImmutable;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
@@ -13,7 +14,7 @@ use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
-class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
+class AggregateDailyUsageJob implements ShouldBeUniqueUntilProcessing, ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
@@ -38,8 +39,12 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
     {
         DB::transaction(function (): void {
             UsageDaily::query()
-                ->whereDate('usage_date', '>=', $this->fromDate)
-                ->whereDate('usage_date', '<=', $this->toDate)
+                ->where('usage_date', '>=', $this->fromDate.' 00:00:00')
+                ->where(
+                    'usage_date',
+                    '<',
+                    CarbonImmutable::parse($this->toDate)->addDay()->toDateString().' 00:00:00',
+                )
                 ->when(
                     $this->merchantId !== null,
                     fn ($query) => $query->where('merchant_id', $this->merchantId),
@@ -47,8 +52,12 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
                 ->delete();
 
             UsageEvent::query()
-                ->whereDate('usage_date', '>=', $this->fromDate)
-                ->whereDate('usage_date', '<=', $this->toDate)
+                ->where('usage_date', '>=', $this->fromDate.' 00:00:00')
+                ->where(
+                    'usage_date',
+                    '<',
+                    CarbonImmutable::parse($this->toDate)->addDay()->toDateString().' 00:00:00',
+                )
                 ->when(
                     $this->merchantId !== null,
                     fn ($query) => $query->where('merchant_id', $this->merchantId),

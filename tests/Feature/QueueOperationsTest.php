@@ -2,6 +2,7 @@
 
 use App\Jobs\AggregateDailyUsageJob;
 use App\Jobs\GenerateInvoiceJob;
+use Illuminate\Contracts\Queue\ShouldBeUniqueUntilProcessing;
 
 it('configures queue reservations longer than job timeouts', function () {
     expect(config('queue.connections.database.retry_after'))->toBeGreaterThan(120)
@@ -10,6 +11,8 @@ it('configures queue reservations longer than job timeouts', function () {
 
 it('configures retry-safe backoff and bounded attempts for usage aggregation', function () {
     $job = new AggregateDailyUsageJob('2026-09-15', '2026-09-15', 1);
+
+    expect($job)->toBeInstanceOf(ShouldBeUniqueUntilProcessing::class);
 
     expect($job->tries)->toBe(3)
         ->and($job->timeout)->toBe(120)

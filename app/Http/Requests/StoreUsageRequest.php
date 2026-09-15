@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\DTOs\UsageEventData;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreUsageRequest extends FormRequest
@@ -28,25 +29,15 @@ class StoreUsageRequest extends FormRequest
         ];
     }
 
-    /**
-     * @return array{
-     *     merchant_id: int,
-     *     customer_id: int,
-     *     subscription_period_id: int,
-     *     event_key: string,
-     *     usage_date: string,
-     *     units: int
-     * }
-     */
-    public function usageData(): array
+    public function usageData(): UsageEventData
     {
-        return [
+        return UsageEventData::fromArray([
             'merchant_id' => $this->integer('merchant_id'),
             'customer_id' => $this->integer('customer_id'),
             'subscription_period_id' => $this->integer('subscription_period_id'),
             'event_key' => $this->string('event_key')->toString(),
             'usage_date' => $this->string('usage_date')->toString(),
             'units' => $this->integer('units'),
-        ];
+        ]);
     }
 }

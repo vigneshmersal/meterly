@@ -73,6 +73,7 @@ class DashboardService
         $cachedPlan = $this->pricingCache->get($merchant, $period->plan_id);
         $usage = $this->usageForRange(
             $merchant,
+            $period->subscription->customer_id,
             $periodStart,
             $this->minimumDate($periodEnd, $today),
         );
@@ -155,7 +156,12 @@ class DashboardService
             $elapsedEnd = $this->minimumDate($periodEnd, $today);
             $elapsedDays = $periodStart->diffInDays($elapsedEnd) + 1;
             $totalDays = $periodStart->diffInDays($periodEnd) + 1;
-            $usage = $this->usageForRange($merchant, $periodStart, $elapsedEnd);
+            $usage = $this->usageForRange(
+                $merchant,
+                $subscription->customer_id,
+                $periodStart,
+                $elapsedEnd,
+            );
             $projectedUsage = ($usage / $elapsedDays) * $totalDays;
             $projectedOverageUnits = max(0, $projectedUsage - $period->included_units);
 
@@ -243,6 +249,7 @@ class DashboardService
 
     private function usageForRange(
         Merchant $merchant,
+        int $customerId,
         CarbonInterface $start,
         CarbonInterface $end,
     ): int {
@@ -251,6 +258,7 @@ class DashboardService
         }
 
         return (int) $merchant->dailyUsage()
+            ->where('customer_id', $customerId)
             ->whereBetween('usage_date', [$start->toDateString(), $end->toDateString()])
             ->sum('units');
     }

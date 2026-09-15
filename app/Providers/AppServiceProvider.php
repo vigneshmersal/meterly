@@ -37,8 +37,12 @@ class AppServiceProvider extends ServiceProvider
         Date::use(CarbonImmutable::class);
 
         RateLimiter::for('usage', function (Request $request): Limit {
+            $merchantId = $request->user()?->merchant_id;
+
             return Limit::perMinute(1000)->by(
-                $request->user()?->getAuthIdentifier().'|'.$request->integer('merchant_id'),
+                $merchantId === null
+                    ? 'ip:'.$request->ip()
+                    : 'merchant:'.$merchantId,
             );
         });
 

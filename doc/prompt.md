@@ -330,3 +330,104 @@ The work is complete only when:
 - Historical invoices remain unchanged after plan edits.
 - Relevant tests pass.
 - Documentation and the submission checklist are complete.
+
+## Prompt — Senior Engineer Review, Deduplication, and Formatting
+
+Act as a Senior Laravel Engineer and interviewer. Review the complete
+implementation against `doc/task.md` and the requirements in this prompt.
+Do not assume that passing tests proves the implementation is complete.
+
+### Review scope
+
+Inspect the complete diff and all related implementation surfaces, including:
+
+- Migrations, schema constraints, indexes, and database query patterns.
+- Models, relationships, casts, scopes, and tenant boundaries.
+- DTOs, form requests, controllers, actions, services, jobs, commands, and
+  scheduled tasks.
+- Usage ingestion, idempotency, rate limiting, aggregation, caching, billing,
+  proration, plan changes, invoice generation, and dashboard calculations.
+- Authentication, authorization, validation, error handling, and mass
+  assignment protections.
+- Factories, seeders, tests, README documentation, and operational setup.
+
+### Required review findings
+
+Identify only concrete issues and classify every finding as:
+
+- **CRITICAL** — data loss, security compromise, cross-tenant exposure,
+  incorrect billing at scale, or unrecoverable financial corruption.
+- **HIGH** — serious correctness, race-condition, idempotency, scalability,
+  authorization, indexing, or production-reliability issue.
+- **MEDIUM** — meaningful maintainability, test-coverage, Laravel-practice,
+  performance, documentation, or edge-case issue.
+
+For each finding, report:
+
+1. Severity.
+2. File and line or symbol.
+3. The exact failure scenario.
+4. Why it violates the requirements or creates operational risk.
+5. A minimal, surgical fix.
+6. A regression test or verification command.
+
+Focus especially on:
+
+- High-volume usage ingestion and 50L+ event scalability.
+- Missing or ineffective database indexes.
+- Concurrent duplicate usage requests and invoice jobs.
+- Queue retries, overlapping workers, transaction boundaries, and failure
+  recovery.
+- Historical pricing, plan-segment billing, proration, overage, and invoice
+  totals.
+- Merchant isolation and IDOR/cross-tenant access.
+- Dashboard query efficiency and accidental raw-event scans.
+- Cache correctness and invalidation after committed plan changes.
+- Missing tests for important boundary, retry, concurrency, and authorization
+  behavior.
+
+Do not report style preferences as defects. Do not speculate without tracing
+the relevant code path. Do not weaken validation or authorization to make
+tests pass.
+
+### Remove duplicate code
+
+After the review, identify genuinely duplicated logic and consolidate it only
+when the resulting abstraction improves correctness and readability. Prefer
+existing helpers, services, DTOs, scopes, and framework conventions. Do not
+create abstractions solely to reduce line count, and do not combine code with
+different business semantics.
+
+### Code format and quality
+
+Format all modified PHP files using the repository's configured formatter.
+Preserve existing project conventions, strict typing, return types, readable
+query composition, and useful comments that explain non-obvious decisions.
+Remove debug code, dead code, redundant imports, placeholder logic, and
+unnecessary comments. Do not reformat unrelated files.
+
+### Implementation and verification
+
+Fix all CRITICAL and HIGH findings and all straightforward MEDIUM findings
+that are directly in scope. Add or update focused Pest tests for every
+behavioral fix. Then run, as supported by the repository:
+
+1. Targeted tests for each changed area.
+2. The complete test suite.
+3. Static analysis.
+4. The configured formatter/check.
+5. Route and scheduler verification.
+6. `git diff --check`.
+
+Do not declare the review complete while a newly introduced test, static
+analysis check, formatter check, or directly related existing test is failing.
+
+### Final review report
+
+End with:
+
+- A severity-ordered findings table, including fixed and accepted items.
+- Files changed and why.
+- Duplicate code removed or intentionally retained.
+- Tests, static checks, formatter checks, and operational commands run.
+- Remaining risks or assumptions, if any.

@@ -18,7 +18,7 @@ class GenerateDueInvoices extends Command
         $dispatched = 0;
 
         SubscriptionPeriod::query()
-            ->whereDate('ends_at', '<=', today()->toDateString())
+            ->where('ends_at', '<=', today()->toDateString())
             ->whereNotExists(function ($query): void {
                 $query->select(DB::raw(1))
                     ->from('invoices')
