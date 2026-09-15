@@ -16,6 +16,19 @@ Both `AggregateDailyUsageJob` and `GenerateInvoiceJob` use three attempts with p
 
 Failed jobs are recorded through Laravel's configured failed-job provider and reported after all attempts are exhausted.
 
+## Usage aggregation
+
+Usage ingestion writes append-oriented records to `usage_events`. Dispatch an
+aggregation job for a merchant and date range after ingestion:
+
+```php
+AggregateDailyUsageJob::dispatch('2026-09-01', '2026-09-15', $merchantId);
+```
+
+The job groups raw events in the database, processes grouped rows in bounded
+chunks, and transactionally rebuilds `usage_daily`. Re-running the same job is
+safe and does not double-count events.
+
 ## Scheduler
 
 Run the scheduler continuously in production:
@@ -45,3 +58,7 @@ DB_QUEUE_RETRY_AFTER=180
 CACHE_STORE=database
 CACHE_PREFIX=meterly
 ```
+
+For production, use a shared Redis cache store when multiple workers or
+application servers are running. The same shared store must be available for
+unique job locks, scheduler locks, and plan-pricing cache invalidation.
