@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use Carbon\CarbonImmutable;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
 
@@ -32,6 +35,12 @@ class AppServiceProvider extends ServiceProvider
     protected function configureDefaults(): void
     {
         Date::use(CarbonImmutable::class);
+
+        RateLimiter::for('usage', function (Request $request): Limit {
+            return Limit::perMinute(1000)->by(
+                $request->user()?->getAuthIdentifier().'|'.$request->integer('merchant_id'),
+            );
+        });
 
         DB::prohibitDestructiveCommands(
             app()->isProduction(),
