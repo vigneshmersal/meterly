@@ -4,7 +4,6 @@ namespace App\Jobs;
 
 use App\Models\UsageDaily;
 use App\Models\UsageEvent;
-use Carbon\CarbonInterface;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -37,45 +36,7 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
 
     public function handle(): void
     {
-        /** @var array<string, array{
-         *     merchant_id: int,
-         *     customer_id: int,
-         *     usage_date: string,
-         *     units: int,
-         *     created_at: CarbonInterface,
-         *     updated_at: CarbonInterface
-         * }> $dailyTotals */
-        $dailyTotals = [];
-
-        UsageEvent::query()
-            ->whereDate('usage_date', '>=', $this->fromDate)
-            ->whereDate('usage_date', '<=', $this->toDate)
-            ->when(
-                $this->merchantId !== null,
-                fn ($query) => $query->where('merchant_id', $this->merchantId),
-            )
-            ->select(['id', 'merchant_id', 'customer_id', 'usage_date', 'units'])
-            ->chunkById($this->chunkSize, function ($events) use (&$dailyTotals): void {
-                foreach ($events as $event) {
-                    $usageDate = substr((string) $event->getRawOriginal('usage_date'), 0, 10);
-                    $key = implode(':', [
-                        $event->merchant_id,
-                        $event->customer_id,
-                        $usageDate,
-                    ]);
-
-                    $dailyTotals[$key] = [
-                        'merchant_id' => $event->merchant_id,
-                        'customer_id' => $event->customer_id,
-                        'usage_date' => $usageDate,
-                        'units' => ($dailyTotals[$key]['units'] ?? 0) + $event->units,
-                        'created_at' => now(),
-                        'updated_at' => now(),
-                    ];
-                }
-            });
-
-        DB::transaction(function () use ($dailyTotals): void {
+        DB::transaction(function (): void {
             UsageDaily::query()
                 ->whereDate('usage_date', '>=', $this->fromDate)
                 ->whereDate('usage_date', '<=', $this->toDate)
@@ -85,15 +46,32 @@ class AggregateDailyUsageJob implements ShouldBeUnique, ShouldQueue
                 )
                 ->delete();
 
-            if ($dailyTotals === []) {
-                return;
-            }
-
-            UsageDaily::query()->upsert(
-                array_values($dailyTotals),
-                ['merchant_id', 'customer_id', 'usage_date'],
-                ['units', 'updated_at'],
-            );
+            UsageEvent::query()
+                ->whereDate('usage_date', '>=', $this->fromDate)
+                ->whereDate('usage_date', '<=', $this->toDate)
+                ->when(
+                    $this->merchantId !== null,
+                    fn ($query) => $query->where('merchant_id', $this->merchantId),
+                )
+                ->selectRaw('merchant_id, customer_id, usage_date, SUM(units) AS units')
+                ->groupBy('merchant_id', 'customer_id', 'usage_date')
+                ->orderBy('merchant_id')
+                ->orderBy('customer_id')
+                ->orderBy('usage_date')
+                ->chunk($this->chunkSize, function ($dailyTotals): void {
+                    UsageDaily::query()->upsert(
+                        $dailyTotals->map(fn ($dailyTotal): array => [
+                            'merchant_id' => $dailyTotal->merchant_id,
+                            'customer_id' => $dailyTotal->customer_id,
+                            'usage_date' => $dailyTotal->usage_date,
+                            'units' => $dailyTotal->units,
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ])->all(),
+                        ['merchant_id', 'customer_id', 'usage_date'],
+                        ['units', 'updated_at'],
+                    );
+                });
         });
     }
 
