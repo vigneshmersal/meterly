@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\Cache;
 
 class PlanPricingCache
 {
-    private const TTL_MINUTES = 30;
+    public const TTL_MINUTES = 30;
 
     /**
      * @return array{

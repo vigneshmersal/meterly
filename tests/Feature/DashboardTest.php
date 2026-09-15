@@ -24,6 +24,16 @@ test('the dashboard renders merchant metrics for the authenticated merchant', fu
         ->get(route('dashboard'))
         ->assertOk()
         ->assertSee('Demo Merchant Dashboard')
-        ->assertSee('Current cycle usage')
-        ->assertSee('No active plan');
+        ->assertSee('data-testid="current-cycle-card"', false)
+        ->assertSee('border-left: 4px solid #2563eb', false)
+        ->assertSee('data-testid="projected-overage-card"', false)
+        ->assertSee('border-left: 4px solid #f97316', false)
+        ->assertSee('data-testid="active-plan-card"', false)
+        ->assertSee('border-left: 4px solid #16a34a', false)
+        ->assertSee('data-testid="churn-risk-card"', false)
+        ->assertSee('background-color: #fef2f2', false)
+        ->assertSee('System status (informational)')
+        ->assertSee('data-testid="system-status-card"', false)
+        ->assertSee('background-color: #eff6ff', false)
+        ->assertSee('Daily usage trend');
 });

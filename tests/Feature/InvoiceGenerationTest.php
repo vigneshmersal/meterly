@@ -9,6 +9,7 @@ use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
 use App\Models\UsageDaily;
 use App\Services\Billing\GenerateInvoiceService;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 
 function invoiceFixture(bool $ended = true): array
@@ -64,6 +65,26 @@ it('does not create a duplicate invoice when generation is retried', function ()
     expect($second->is($first))->toBeTrue()
         ->and(Invoice::query()->count())->toBe(1)
         ->and($first->items()->count())->toBe(1);
+});
+
+it('logs invoice generation and idempotent reuse', function () {
+    Log::spy();
+    [, , , , $period] = invoiceFixture();
+    $service = app(GenerateInvoiceService::class);
+
+    $service->handle($period);
+    $service->handle($period);
+
+    Log::shouldHaveReceived('info')
+        ->with('Invoice generated successfully.', Mockery::on(
+            fn (array $context): bool => isset($context['invoice_id'], $context['total']),
+        ))
+        ->once();
+    Log::shouldHaveReceived('info')
+        ->with('Invoice generation skipped because invoice already exists.', Mockery::on(
+            fn (array $context): bool => isset($context['invoice_id']),
+        ))
+        ->once();
 });
 
 it('dispatches jobs only for completed periods', function () {

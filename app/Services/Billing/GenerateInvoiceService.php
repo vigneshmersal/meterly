@@ -9,6 +9,7 @@ use App\Support\DatabaseExceptionClassifier;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GenerateInvoiceService
 {
@@ -22,9 +23,19 @@ class GenerateInvoiceService
 
         $periodStart = CarbonImmutable::parse($period->getRawOriginal('starts_at'));
         $periodEnd = CarbonImmutable::parse($period->getRawOriginal('ends_at'));
+        $context = [
+            'merchant_id' => $period->subscription->customer->merchant_id,
+            'customer_id' => $period->subscription->customer_id,
+            'subscription_id' => $period->subscription_id,
+            'subscription_period_id' => $period->id,
+            'period_start' => $periodStart->toDateString(),
+            'period_end' => $periodEnd->toDateString(),
+        ];
+
+        Log::info('Invoice generation started.', $context);
 
         try {
-            return DB::transaction(function () use ($period, $periodStart, $periodEnd): Invoice {
+            [$invoice, $created] = DB::transaction(function () use ($period, $periodStart, $periodEnd): array {
                 $existingInvoice = Invoice::query()
                     ->where('subscription_id', $period->subscription_id)
                     ->whereDate('period_start', $periodStart->toDateString())
@@ -32,7 +43,7 @@ class GenerateInvoiceService
                     ->first();
 
                 if ($existingInvoice !== null) {
-                    return $existingInvoice->load('items');
+                    return [$existingInvoice->load('items'), false];
                 }
 
                 $charges = $this->billing->periodCharges(
@@ -74,8 +85,23 @@ class GenerateInvoiceService
                     ]);
                 }
 
-                return $invoice->load('items');
+                return [$invoice->load('items'), true];
             });
+
+            if ($created) {
+                Log::info('Invoice generated successfully.', $context + [
+                    'invoice_id' => $invoice->id,
+                    'subtotal' => $invoice->subtotal,
+                    'overage_amount' => $invoice->overage_amount,
+                    'total' => $invoice->total,
+                ]);
+            } else {
+                Log::info('Invoice generation skipped because invoice already exists.', $context + [
+                    'invoice_id' => $invoice->id,
+                ]);
+            }
+
+            return $invoice;
         } catch (QueryException $exception) {
             if (! DatabaseExceptionClassifier::isUniqueConstraintViolation($exception)) {
                 throw $exception;
@@ -90,6 +116,10 @@ class GenerateInvoiceService
             if ($existingInvoice === null) {
                 throw $exception;
             }
+
+            Log::warning('Invoice generation encountered a concurrent duplicate and reused the existing invoice.', $context + [
+                'invoice_id' => $existingInvoice->id,
+            ]);
 
             return $existingInvoice->load('items');
         }

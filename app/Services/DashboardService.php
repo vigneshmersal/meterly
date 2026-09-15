@@ -19,7 +19,16 @@ class DashboardService
     /**
      * @return array{
      *     active_plan: array<string, mixed>|null,
-     *     system_status: array{status: string, message: string, aggregation_up_to_date: bool},
+     *     system_status: array{
+     *         status: string,
+     *         message: string,
+     *         aggregation_up_to_date: bool,
+     *         cache: string,
+     *         cache_ttl_minutes: int,
+     *         aggregation: string,
+     *         aggregation_chunk_size: int,
+     *         usage_rate_limit: string
+     *     },
      *     top_customers: array<int, array{customer_id: int, name: string, usage: int}>,
      *     projected_overage_revenue: float,
      *     churn_risk_customers: array<int, array{customer_id: int, name: string, previous_month_usage: int, current_month_usage: int, drop_percentage: float}>,
@@ -95,7 +104,18 @@ class DashboardService
         ];
     }
 
-    /** @return array{status: string, message: string, aggregation_up_to_date: bool} */
+    /**
+     * @return array{
+     *     status: string,
+     *     message: string,
+     *     aggregation_up_to_date: bool,
+     *     cache: string,
+     *     cache_ttl_minutes: int,
+     *     aggregation: string,
+     *     aggregation_chunk_size: int,
+     *     usage_rate_limit: string
+     * }
+     */
     private function systemStatus(Merchant $merchant): array
     {
         $latestRawDate = $merchant->usageEvents()->max('usage_date');
@@ -111,6 +131,11 @@ class DashboardService
                 ? 'Usage data is up to date'
                 : 'Usage aggregation is processing recent data',
             'aggregation_up_to_date' => $upToDate,
+            'cache' => ucfirst((string) config('cache.default')).' plan pricing cache',
+            'cache_ttl_minutes' => PlanPricingCache::TTL_MINUTES,
+            'aggregation' => 'Queued, chunked',
+            'aggregation_chunk_size' => 1000,
+            'usage_rate_limit' => '1,000 requests/minute per merchant',
         ];
     }
 

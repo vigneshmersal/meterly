@@ -46,6 +46,30 @@ php artisan schedule:list
 php artisan billing:generate-invoices
 ```
 
+The demo seeder creates one completed billing period with usage so the command
+can be tested locally:
+
+```bash
+php artisan db:seed
+php artisan billing:generate-invoices
+php artisan queue:work --once
+```
+
+The first command dispatches one invoice job. The queue worker processes it,
+and running `billing:generate-invoices` again then reports zero jobs because
+the invoice already exists. Inspect the generated invoice with:
+
+```bash
+php artisan tinker
+```
+
+```php
+App\Models\Invoice::with('items')
+    ->whereHas('customer', fn ($query) => $query->where('email', 'billing-demo@example.com'))
+    ->latest()
+    ->first();
+```
+
 ## Cache and environment
 
 Queue uniqueness and scheduler locks require a shared cache store when multiple workers or application servers are used. Configure `CACHE_STORE` and `CACHE_PREFIX` consistently across those processes. Redis is preferred for multi-server deployments; the default `failover` store tries Redis first and falls back to the database cache when Redis is unavailable. Production deployments should run Redis rather than rely on fallback.

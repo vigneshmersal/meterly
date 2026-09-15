@@ -17,7 +17,7 @@
             </div>
 
             <div class="grid gap-4 md:grid-cols-3">
-                <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <div data-testid="current-cycle-card" class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900" style="border-left: 4px solid #2563eb;">
                     <flux:text>{{ __('Current cycle usage') }}</flux:text>
                     <flux:heading size="lg" class="mt-2">
                         {{ number_format($metrics['active_plan']['current_cycle_usage']['units'] ?? 0) }}
@@ -25,14 +25,14 @@
                     </flux:heading>
                     <flux:text class="mt-1">{{ __('units') }}</flux:text>
                 </div>
-                <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <div data-testid="projected-overage-card" class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900" style="border-left: 4px solid #f97316;">
                     <flux:text>{{ __('Projected overage revenue') }}</flux:text>
                     <flux:heading size="lg" class="mt-2">
                         {{ number_format((float) $metrics['projected_overage_revenue'], 2) }}
                     </flux:heading>
                     <flux:text class="mt-1">{{ __('forecast') }}</flux:text>
                 </div>
-                <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <div data-testid="active-plan-card" class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900" style="border-left: 4px solid #16a34a;">
                     <flux:text>{{ __('Active plan') }}</flux:text>
                     <flux:heading size="lg" class="mt-2">
                         {{ $metrics['active_plan']['name'] ?? __('No active plan') }}
@@ -70,9 +70,9 @@
                     </div>
                 </div>
 
-                <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+                <div data-testid="churn-risk-card" class="rounded-xl border border-red-300 p-5 shadow-sm dark:border-red-900" style="background-color: #fef2f2;">
                     <flux:heading size="lg">{{ __('Churn risk') }}</flux:heading>
-                    <flux:text class="mt-1">{{ __('Customers with a usage drop greater than 50%.') }}</flux:text>
+                    <flux:text class="mt-1 text-red-800 dark:text-red-200">{{ __('Customers with a usage drop greater than 50%.') }}</flux:text>
                     <ul class="mt-4 space-y-3 text-sm">
                         @forelse ($metrics['churn_risk_customers'] as $customer)
                             <li class="flex items-center justify-between gap-3">
@@ -80,10 +80,30 @@
                                 <flux:badge color="red">{{ $customer['drop_percentage'] }}%</flux:badge>
                             </li>
                         @empty
-                            <li class="text-zinc-500">{{ __('No churn risk detected.') }}</li>
+                            <li class="text-red-800 dark:text-red-200">{{ __('No churn risk detected.') }}</li>
                         @endforelse
                     </ul>
                 </div>
+            </div>
+
+            <div data-testid="system-status-card" class="rounded-xl border border-sky-300 p-5 shadow-sm dark:border-sky-800" style="background-color: #eff6ff;">
+                <flux:heading size="lg" class="text-sky-700 dark:text-sky-300">
+                    {{ __('System status (informational)') }}
+                </flux:heading>
+                <ul class="mt-4 grid gap-3 text-sm leading-6 text-sky-900 dark:text-sky-100 md:grid-cols-3 md:gap-6">
+                    <li>
+                        <span class="block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Plan pricing cache') }}</span>
+                        <span>{{ $metrics['system_status']['cache'] }}, {{ __('TTL :minutes minutes', ['minutes' => $metrics['system_status']['cache_ttl_minutes']]) }}</span>
+                    </li>
+                    <li>
+                        <span class="block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Nightly aggregation job') }}</span>
+                        <span>{{ $metrics['system_status']['aggregation'] }} ({{ number_format($metrics['system_status']['aggregation_chunk_size']) }} {{ __('rows/batch') }})</span>
+                    </li>
+                    <li>
+                        <span class="block text-xs font-medium uppercase tracking-wide text-zinc-500">{{ __('Usage endpoint') }}</span>
+                        <span>{{ __('Rate-limited') }} ({{ $metrics['system_status']['usage_rate_limit'] }})</span>
+                    </li>
+                </ul>
             </div>
 
             <div class="rounded-xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
@@ -94,18 +114,45 @@
                     </div>
                     <flux:text>{{ $metrics['system_status']['message'] }}</flux:text>
                 </div>
-                <div class="mt-5 grid grid-cols-6 gap-2 sm:grid-cols-10 md:grid-cols-15 lg:grid-cols-30">
-                    @foreach ($metrics['usage_trend'] as $day)
-                        <div class="group flex min-w-0 flex-col items-center gap-1">
-                            <div
-                                class="w-full rounded-sm bg-blue-500/80"
-                                style="height: {{ max(4, min(100, $day['units'] > 0 ? 20 + log($day['units'] + 1) * 8 : 4)) }}px"
-                                title="{{ $day['date'] }}: {{ number_format($day['units']) }} units"
-                            ></div>
-                            @if ($loop->first || $loop->last || $loop->iteration % 7 === 0)
-                                <span class="truncate text-[10px] text-zinc-500">{{ \Illuminate\Support\Carbon::parse($day['date'])->format('M d') }}</span>
-                            @endif
-                        </div>
+                @php
+                    $trend = collect($metrics['usage_trend']);
+                    $trendMax = max(1, (int) $trend->max('units'));
+                    $trendPoints = $trend->map(function (array $day, int $index) use ($trend, $trendMax): string {
+                        $x = $trend->count() > 1 ? ($index / ($trend->count() - 1)) * 1000 : 500;
+                        $y = 232 - (($day['units'] / $trendMax) * 192);
+
+                        return number_format($x, 2, '.', '').','.number_format($y, 2, '.', '');
+                    })->implode(' ');
+                @endphp
+                <div class="mt-5 overflow-hidden rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <svg
+                        class="h-64 w-full min-w-[640px]"
+                        viewBox="0 0 1000 260"
+                        role="img"
+                        aria-label="{{ __('Daily usage trend for the last 30 calendar days') }}"
+                    >
+                        <line x1="0" y1="24" x2="1000" y2="24" stroke="#3f3f46" stroke-width="1" />
+                        <line x1="0" y1="128" x2="1000" y2="128" stroke="#3f3f46" stroke-width="1" />
+                        <line x1="0" y1="232" x2="1000" y2="232" stroke="#52525b" stroke-width="1" />
+                        @foreach ([0, 250, 500, 750, 1000] as $gridX)
+                            <line x1="{{ $gridX }}" y1="24" x2="{{ $gridX }}" y2="232" stroke="#3f3f46" stroke-width="1" />
+                        @endforeach
+                        <polyline
+                            points="{{ $trendPoints }}"
+                            fill="none"
+                            stroke="#3b82f6"
+                            stroke-width="4"
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            vector-effect="non-scaling-stroke"
+                        />
+                    </svg>
+                </div>
+                <div class="mt-2 flex justify-between text-xs text-zinc-500">
+                    @foreach ($trend as $day)
+                        @if ($loop->first || $loop->last || $loop->iteration % 7 === 0)
+                            <span>{{ \Illuminate\Support\Carbon::parse($day['date'])->format('M d') }}</span>
+                        @endif
                     @endforeach
                 </div>
             </div>
