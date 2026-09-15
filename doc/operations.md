@@ -48,14 +48,14 @@ php artisan billing:generate-invoices
 
 ## Cache and environment
 
-Queue uniqueness and scheduler locks require a shared cache store when multiple workers or application servers are used. Configure `CACHE_STORE` and `CACHE_PREFIX` consistently across those processes. Redis is recommended for multi-server deployments; the local default uses the database cache store.
+Queue uniqueness and scheduler locks require a shared cache store when multiple workers or application servers are used. Configure `CACHE_STORE` and `CACHE_PREFIX` consistently across those processes. Redis is preferred for multi-server deployments; the default `failover` store tries Redis first and falls back to the database cache when Redis is unavailable. Production deployments should run Redis rather than rely on fallback.
 
 Relevant environment variables:
 
 ```dotenv
 QUEUE_CONNECTION=database
 DB_QUEUE_RETRY_AFTER=180
-CACHE_STORE=database
+CACHE_STORE=failover
 CACHE_PREFIX=meterly
 ```
 

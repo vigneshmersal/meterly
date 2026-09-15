@@ -34,10 +34,15 @@ function usageFixture(): array
     return [$merchant, $customer, $period];
 }
 
+function usageToken(User $user): string
+{
+    return $user->createToken('usage-test')->plainTextToken;
+}
+
 it('requires authentication to record usage', function () {
     [$merchant, $customer, $period] = usageFixture();
 
-    $this->postJson('/usage', usagePayload($merchant, $customer, $period))
+    $this->postJson('/api/usage', usagePayload($merchant, $customer, $period))
         ->assertUnauthorized();
 });
 
@@ -45,8 +50,10 @@ it('records a validated usage event for an authenticated merchant request', func
     [$merchant, $customer, $period] = usageFixture();
     $payload = usagePayload($merchant, $customer, $period);
 
-    $this->actingAs(User::factory()->for($merchant)->create())
-        ->postJson('/usage', $payload)
+    $user = User::factory()->for($merchant)->create();
+
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', $payload)
         ->assertCreated()
         ->assertExactJson([
             'message' => 'Usage recorded successfully',
@@ -62,8 +69,10 @@ it('dispatches merchant-scoped aggregation after recording a new event', functio
     [$merchant, $customer, $period] = usageFixture();
     $payload = usagePayload($merchant, $customer, $period);
 
-    $this->actingAs(User::factory()->for($merchant)->create())
-        ->postJson('/usage', $payload)
+    $user = User::factory()->for($merchant)->create();
+
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', $payload)
         ->assertCreated();
 
     Queue::assertPushed(
@@ -79,8 +88,10 @@ it('rejects usage outside the subscription period', function () {
     $payload = usagePayload($merchant, $customer, $period);
     $payload['usage_date'] = $period->ends_at->addDay()->toDateString();
 
-    $this->actingAs(User::factory()->for($merchant)->create())
-        ->postJson('/usage', $payload)
+    $user = User::factory()->for($merchant)->create();
+
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', $payload)
         ->assertUnprocessable()
         ->assertJsonValidationErrors(['usage_date']);
 
@@ -107,8 +118,10 @@ it('builds a usage DTO from validated payload data', function () {
 });
 
 it('rejects invalid usage input', function () {
-    $this->actingAs(User::factory()->create())
-        ->postJson('/usage', [])
+    $user = User::factory()->create();
+
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', [])
         ->assertUnprocessable()
         ->assertJsonValidationErrors([
             'merchant_id',
@@ -125,9 +138,9 @@ it('returns the idempotent response without duplicating a usage event', function
     $payload = usagePayload($merchant, $customer, $period);
     $user = User::factory()->for($merchant)->create();
 
-    $this->actingAs($user)->postJson('/usage', $payload)->assertCreated();
-    $this->actingAs($user)
-        ->postJson('/usage', $payload)
+    $this->withToken(usageToken($user))->postJson('/api/usage', $payload)->assertCreated();
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', $payload)
         ->assertOk()
         ->assertExactJson([
             'message' => 'Usage event already recorded',
@@ -142,17 +155,20 @@ it('rejects cross-merchant usage references', function () {
     $otherMerchant = Merchant::factory()->create();
     $payload = usagePayload($otherMerchant, $customer, $period);
 
-    $this->actingAs(User::factory()->for($otherMerchant)->create())
-        ->postJson('/usage', $payload)
+    $user = User::factory()->for($otherMerchant)->create();
+
+    $this->withToken(usageToken($user))
+        ->postJson('/api/usage', $payload)
         ->assertNotFound();
 
     expect(UsageEvent::query()->count())->toBe(0);
 });
 
 it('registers the usage route with its named rate limiter', function () {
-    expect(app('router')->getRoutes()->getByName('usage.store')->uri())
-        ->toBe('usage');
+    expect(app('router')->getRoutes()->getByName('api.usage.store')->uri())
+        ->toBe('api/usage');
 
-    expect(app('router')->getRoutes()->getByName('usage.store')->gatherMiddleware())
+    expect(app('router')->getRoutes()->getByName('api.usage.store')->gatherMiddleware())
+        ->toContain('auth:sanctum')
         ->toContain('throttle:usage');
 });

@@ -20,12 +20,14 @@ The default local configuration uses:
 ```dotenv
 DB_CONNECTION=sqlite
 QUEUE_CONNECTION=database
-CACHE_STORE=redis
+CACHE_STORE=failover
 ```
 
-Redis is used for the shared plan-pricing cache, queue uniqueness and
-scheduler locks. A running Redis server is required by the default local
-configuration.
+Redis is the preferred shared plan-pricing cache, queue uniqueness, and
+scheduler-lock store. The `failover` cache store falls back to the database
+cache (and then the in-memory array store) when Redis is unavailable, which
+keeps local development usable while Redis is being started. Production
+deployments should run Redis and monitor fallback usage.
 
 ## Installation
 
@@ -41,8 +43,8 @@ npm run build
 
 Configure `DB_*`, `QUEUE_CONNECTION`, `DB_QUEUE_RETRY_AFTER`, `CACHE_STORE`,
 `CACHE_PREFIX`, and the Redis credentials in `.env` as appropriate for the
-environment. Set `CACHE_STORE=database` only when deliberately using the
-database cache fallback.
+environment. Set `CACHE_STORE=redis` to require Redis explicitly, or
+`CACHE_STORE=database` when deliberately using only the database cache.
 
 ## Running the application
 
@@ -96,7 +98,26 @@ middleware.
 ### Record usage
 
 ```http
-POST /usage
+POST /api/usage
+```
+
+Usage ingestion uses Laravel Sanctum personal access tokens. Obtain a token
+with:
+
+```http
+POST /api/login
+Content-Type: application/json
+
+{
+  "email": "demo@meterly.test",
+  "password": "password"
+}
+```
+
+Send the returned token as a bearer token:
+
+```http
+Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
