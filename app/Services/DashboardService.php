@@ -12,6 +12,10 @@ use Carbon\CarbonInterface;
 
 class DashboardService
 {
+    public function __construct(
+        private readonly PlanPricingCache $pricingCache,
+    ) {}
+
     /**
      * @return array{
      *     active_plan: array<string, mixed>|null,
@@ -66,6 +70,7 @@ class DashboardService
     ): array {
         $periodStart = $this->periodStart($period);
         $periodEnd = $this->periodEnd($period);
+        $cachedPlan = $this->pricingCache->get($merchant, $period->plan_id);
         $usage = $this->usageForRange(
             $merchant,
             $periodStart,
@@ -76,7 +81,7 @@ class DashboardService
             : round(($usage / $period->included_units) * 100, 2);
 
         return [
-            'name' => $period->plan->name,
+            'name' => $cachedPlan['name'],
             'billing_cycle' => BillingCycle::from($period->getRawOriginal('billing_cycle'))->value,
             'included_units' => $period->included_units,
             'current_period_start' => $periodStart->toDateString(),
