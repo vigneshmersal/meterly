@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\BillingCycle;
 use Database\Factories\PlanFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,9 +20,15 @@ class Plan extends Model
     {
         return [
             'base_price' => 'decimal:2',
+            'billing_cycle' => BillingCycle::class,
             'included_units' => 'integer',
             'overage_rate' => 'decimal:4',
         ];
+    }
+
+    public function billingCycle(): BillingCycle
+    {
+        return BillingCycle::from($this->getRawOriginal('billing_cycle'));
     }
 
     /** @return BelongsTo<Merchant, $this> */

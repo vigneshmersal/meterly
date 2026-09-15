@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\BillingCycle;
 use App\Models\Plan;
 use App\Models\Subscription;
 use App\Models\SubscriptionPeriod;
@@ -25,6 +26,7 @@ class SubscriptionPeriodFactory extends Factory
             'plan_id' => $plan,
             'starts_at' => $startsAt,
             'ends_at' => $startsAt->copy()->addMonth()->subDay(),
+            'billing_cycle' => BillingCycle::Monthly,
             'base_price' => fake()->randomFloat(2, 500, 5000),
             'included_units' => fake()->numberBetween(1000, 100000),
             'overage_rate' => fake()->randomFloat(4, 0.01, 1),

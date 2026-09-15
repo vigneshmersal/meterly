@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\BillingCycle;
 use App\Models\Merchant;
 use App\Models\Plan;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -19,7 +20,7 @@ class PlanFactory extends Factory
             'merchant_id' => Merchant::factory(),
             'name' => fake()->randomElement(['Basic', 'Pro', 'Enterprise']),
             'base_price' => fake()->randomFloat(2, 500, 5000),
-            'billing_cycle' => 'monthly',
+            'billing_cycle' => BillingCycle::Monthly,
             'included_units' => fake()->numberBetween(1000, 100000),
             'overage_rate' => fake()->randomFloat(4, 0.01, 1),
         ];

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Enums\SubscriptionStatus;
 use Database\Factories\SubscriptionFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,7 +22,14 @@ class Subscription extends Model
         return [
             'starts_at' => 'date',
             'ends_at' => 'date',
+            'status' => SubscriptionStatus::class,
         ];
+    }
+
+    /** @param Builder<Subscription> $query */
+    public function scopeActive(Builder $query): void
+    {
+        $query->where('status', SubscriptionStatus::Active);
     }
 
     /** @return BelongsTo<Customer, $this> */

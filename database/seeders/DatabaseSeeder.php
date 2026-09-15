@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\BillingCycle;
 use App\Models\Customer;
 use App\Models\Merchant;
 use App\Models\Plan;
@@ -34,7 +35,7 @@ class DatabaseSeeder extends Seeder
         $plan = Plan::factory()->for($merchant)->create([
             'name' => 'Pro',
             'base_price' => 3000,
-            'billing_cycle' => 'monthly',
+            'billing_cycle' => BillingCycle::Monthly,
             'included_units' => 50000,
             'overage_rate' => 0.08,
         ]);
