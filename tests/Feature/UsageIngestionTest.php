@@ -54,6 +54,25 @@ it('records a validated usage event for an authenticated merchant request', func
         ->toBe(250);
 });
 
+it('builds a usage DTO from validated payload data', function () {
+    $dto = App\DTOs\UsageEventData::fromArray([
+        'merchant_id' => 99,
+        'customer_id' => 100,
+        'subscription_period_id' => 101,
+        'event_key' => 'evt_test',
+        'usage_date' => '2026-09-13',
+        'units' => 250,
+    ]);
+
+    expect($dto)->toBeInstanceOf(App\DTOs\UsageEventData::class)
+        ->and($dto->merchantId)->toBe(99)
+        ->and($dto->customerId)->toBe(100)
+        ->and($dto->subscriptionPeriodId)->toBe(101)
+        ->and($dto->eventKey)->toBe('evt_test')
+        ->and($dto->usageDate->toDateString())->toBe('2026-09-13')
+        ->and($dto->units)->toBe(250);
+});
+
 it('rejects invalid usage input', function () {
     $this->actingAs(User::factory()->create())
         ->postJson('/usage', [])

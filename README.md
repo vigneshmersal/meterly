@@ -5,6 +5,13 @@ multi-tenant merchants. It records high-volume usage events, asynchronously
 builds daily usage aggregates, calculates subscription billing, generates
 invoices, and exposes merchant dashboard insights.
 
+![Meterly dashboard](docs/images/image.png)
+
+## AI-assisted development prompts
+
+The prompts used during AI-assisted implementation and review are recorded in
+the [`prompts/`](prompts/) folder.
+
 ## Requirements
 
 - PHP 8.3 or newer
