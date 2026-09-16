@@ -319,3 +319,5 @@ operations.
 AI tools were used for requirement analysis, architecture discussion, code
 scaffolding, test generation, and code review. All generated code was
 reviewed, tested, and modified as required.
+
+Related implementation chat: [Open the project chat](agent-host-session://copilotcli/1e15e18a-9067-4c7e-bdea-5360aae28cd3).
